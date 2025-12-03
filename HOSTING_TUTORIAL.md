@@ -34,7 +34,7 @@
    - **Start Command:** `node index.js`
 6. Klicke auf **"Advanced"** → **"Add Environment Variable"**
    - **Key:** `DISCORD_TOKEN`
-   - **Value:** `MTQ0NTc4NTgxMTkzMjAyMDg0OQ.G1fMzw.86M5GYf9bviOqpjOPReiKx2-L_jf9JO_dvlDKQ`
+   - **Value:** `DEIN_BOT_TOKEN_AUS_DEM_DISCORD_PORTAL`
 7. Klicke auf **"Create Web Service"**
 
 ### Schritt 5: Fertig! 🎉
@@ -60,7 +60,7 @@
 1. Klicke auf dein Projekt → **"Variables"**
 2. Füge hinzu:
    - **Key:** `DISCORD_TOKEN`
-   - **Value:** `MTQ0NTc4NTgxMTkzMjAyMDg0OQ.G1fMzw.86M5GYf9bviOqpjOPReiKx2-L_jf9JO_dvlDKQ`
+   - **Value:** `DEIN_BOT_TOKEN_AUS_DEM_DISCORD_PORTAL`
 
 ### Schritt 4: Settings
 1. Gehe zu **"Settings"**

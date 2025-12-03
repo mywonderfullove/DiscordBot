@@ -12,8 +12,9 @@ Dieser Bot verwaltet eine "DK-Liste" (Gegnerliste) für Clans und Spieler.
 3. **Konfiguration**:
    Erstelle eine Datei namens `.env` im gleichen Ordner und füge deinen Bot-Token ein:
    ```env
-   DISCORD_TOKEN=MTQ0NTc4NTgxMTkzMjAyMDg0OQ.G1fMzw.86M5GYf9bviOqpjOPReiKx2-L_jf9JO_dvlDKQ
+   DISCORD_TOKEN=DEIN_BOT_TOKEN_HIER
    ```
+   **WICHTIG:** Hole dir den Token aus dem [Discord Developer Portal](https://discord.com/developers/applications)!
 
 ## WICHTIG: Message Content Intent
 

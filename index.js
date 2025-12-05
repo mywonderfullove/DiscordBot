@@ -11,7 +11,14 @@ const client = new Client({
     ] 
 });
 
-const DB_PATH = path.join(__dirname, 'db.json');
+// Nutze Render Disk für persistente Speicherung, falls verfügbar
+// Render Disk wird unter /opt/render/project/src/.data gemountet
+const RENDER_DISK_PATH = '/opt/render/project/src/.data';
+const DB_PATH = process.env.RENDER_DISK_PATH 
+    ? path.join(process.env.RENDER_DISK_PATH, 'db.json')
+    : fs.existsSync(RENDER_DISK_PATH)
+    ? path.join(RENDER_DISK_PATH, 'db.json')
+    : path.join(__dirname, 'db.json');
 
 // Helper functions for DB - Pro Server (Guild) Basis
 function readDB() {
@@ -37,6 +44,11 @@ function readDB() {
 
 function writeDB(data) {
     try {
+        // Stelle sicher, dass das Verzeichnis existiert
+        const dbDir = path.dirname(DB_PATH);
+        if (!fs.existsSync(dbDir)) {
+            fs.mkdirSync(dbDir, { recursive: true });
+        }
         fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
         return true;
     } catch (err) {

@@ -23,6 +23,18 @@ const DB_PATH = process.env.RENDER_DISK_PATH
 // Helper functions for DB - Pro Server (Guild) Basis
 function readDB() {
     try {
+        // Stelle sicher, dass das Verzeichnis existiert
+        const dbDir = path.dirname(DB_PATH);
+        if (!fs.existsSync(dbDir)) {
+            fs.mkdirSync(dbDir, { recursive: true });
+        }
+        
+        // Prüfe, ob die Datei existiert
+        if (!fs.existsSync(DB_PATH)) {
+            // Datei existiert nicht - erstelle leere DB
+            return { guilds: {} };
+        }
+        
         const data = fs.readFileSync(DB_PATH, 'utf8');
         const parsed = JSON.parse(data);
         

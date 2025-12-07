@@ -183,8 +183,8 @@ client.once('ready', () => {
     console.log(`Eingeloggt als ${client.user.tag}!`);
     console.log('Bot ist bereit und hört auf !-Befehle.');
     
-    // Status setzen: Hört zu "value"
-    client.user.setActivity('value', { type: ActivityType.Listening });
+    // Status setzen: Hört zu "demon"
+    client.user.setActivity('demon', { type: ActivityType.Listening });
 });
 
 client.on('messageCreate', async message => {

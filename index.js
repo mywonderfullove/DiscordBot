@@ -3,16 +3,15 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-const client = new Client({ 
+const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent
-    ] 
+    ]
 });
 
-// Nutze Render Disk für persistente Speicherung, falls verfügbar
-// Render Disk wird unter /opt/render/project/src/.data gemountet
+// Nur einmal den Pfad für die Datenbank definieren
 const RENDER_DISK_PATH = '/opt/render/project/src/.data';
 const DB_PATH = process.env.RENDER_DISK_PATH 
     ? path.join(process.env.RENDER_DISK_PATH, 'db.json')
@@ -20,7 +19,7 @@ const DB_PATH = process.env.RENDER_DISK_PATH
     ? path.join(RENDER_DISK_PATH, 'db.json')
     : path.join(__dirname, 'db.json');
 
-// Helper functions for DB - Pro Server (Guild) Basis
+// Hilfsfunktionen für DB - Pro Server (Guild) Basis
 function readDB() {
     try {
         // Stelle sicher, dass das Verzeichnis existiert
@@ -40,10 +39,7 @@ function readDB() {
         
         // Migration: Alte Struktur zu neuer pro-Guild Struktur
         if (parsed.clans || parsed.players || parsed.embeds) {
-            // Alte Struktur gefunden - migrieren
             parsed.guilds = parsed.guilds || {};
-            // Wir können die alte DB nicht automatisch einer Guild zuordnen,
-            // also lassen wir sie erstmal und sie wird beim ersten Setup überschrieben
         }
         
         if (!parsed.guilds) parsed.guilds = {};
@@ -91,12 +87,6 @@ function escapeUnderscores(text) {
 }
 
 function getDKEmbed(guildData) {
-    // Design Anpassungen:
-    // - Title als H1 (#) in Description für Größe
-    // - "Mittig" simuliert durch Leerzeichen (Discord unterstützt kein echtes Center)
-    // - Listen-Items normal (nicht fett), kleinerer Punkt
-    // - Mehr Abstand nach Emojis bei Headern
-    
     const clanList = guildData.clans.length > 0 
         ? guildData.clans.map(c => `• ${escapeUnderscores(c)}`).join('\n') 
         : '> *Keine Clans eingetragen*';
@@ -105,7 +95,6 @@ function getDKEmbed(guildData) {
         ? guildData.players.map(p => `• ${escapeUnderscores(p)}`).join('\n') 
         : '> *Keine Spieler eingetragen*';
 
-    // Wir bauen alles in die Description
     const description = `
 # ⚔️ \u2000 DK - LIST \u2000 ⚔️
 
@@ -118,7 +107,6 @@ ${playerList}
     `;
 
     return new EmbedBuilder()
-        // .setTitle(...) entfernen wir, da wir es oben größer machen
         .setColor(0xFF0000)
         .setDescription(description)
         .setFooter({ text: 'vx' })
@@ -146,18 +134,16 @@ async function updateAllEmbeds(guildId, guildData) {
                 const message = await channel.messages.fetch(embedInfo.messageId);
                 if (message) {
                     await message.edit({ embeds: [getDKEmbed(guildData)] });
-                    activeEmbeds.push(embedInfo); // Erfolgreich aktualisiert, behalten
+                    activeEmbeds.push(embedInfo); 
                     updatedCount++;
                     continue;
                 }
             }
         } catch (e) {
-            // Nachricht oder Kanal existiert wahrscheinlich nicht mehr
             console.log(`Embed in ${embedInfo.channelId} konnte nicht aktualisiert werden (gelöscht?):`, e.message);
         }
     }
 
-    // DB aktualisieren, falls wir tote Embeds entfernt haben
     if (activeEmbeds.length !== guildData.embeds.length) {
         guildData.embeds = activeEmbeds;
         saveGuildData(guildId, guildData);
@@ -179,19 +165,68 @@ async function registerNewEmbed(message, guildId, guildData) {
     return sentMsg;
 }
 
+// Funktion zum Speichern der Nachrichten des Bots
+async function saveMyMessages() {
+    try {
+        const channel = await client.channels.fetch('1445798394730778767'); // Beispiel-Channel-ID
+        if (!channel) {
+            console.error('Kanal nicht gefunden!');
+            return;
+        }
+
+        const messages = await channel.messages.fetch({ limit: 100 });
+        const myMessages = messages
+            .filter(msg => msg.author.id === client.user.id) // Nur Nachrichten des Bots
+            .sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+
+        if (myMessages.size === 0) {
+            console.log('Keine Nachrichten des Bots gefunden!');
+            return;
+        }
+
+        let content = `📋 Gespeicherte Nachrichten von ${client.user.tag}\n`;
+        content += `📅 Erstellt am: ${new Date().toLocaleString('de-DE')}\n`;
+        content += `💬 Kanal: #${channel.name}\n`;
+        content += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+        myMessages.forEach(msg => {
+            const time = msg.createdAt.toLocaleString('de-DE');
+            content += `[${time}] ${msg.content || '(Anhang/Embed)'}\n`;
+            if (msg.attachments.size > 0) {
+                content += `  📎 ${msg.attachments.size} Anhang(e)\n`;
+            }
+        });
+
+        const fileName = `nachrichten_${channel.id}_${Date.now()}.txt`;
+        const filePath = path.join(__dirname, fileName);
+        fs.writeFileSync(filePath, content, 'utf8');
+
+        console.log(`✅ **${myMessages.size} Nachrichten gespeichert!**`);
+        fs.unlinkSync(filePath);
+    } catch (err) {
+        console.error('Fehler beim Speichern der Nachrichten:', err);
+    }
+}
+
 client.once('ready', () => {
     console.log(`Eingeloggt als ${client.user.tag}!`);
-    console.log('Bot ist bereit und hört auf !-Befehle.');
-    
+    console.log('Bot ist bereit.');
+
     // Status setzen: Hört zu "demon"
     client.user.setActivity('demon', { type: ActivityType.Listening });
+});
+
+// Beim Beenden des Bots (z.B. mit Ctrl+C) die Nachrichten speichern
+process.on('SIGINT', async () => {
+    console.log('Bot wird gestoppt...');
+    await saveMyMessages();  // Speichern der Nachrichten
+    process.exit(0);  // Erfolgreiches Beenden des Prozesses
 });
 
 client.on('messageCreate', async message => {
     if (message.author.bot) return;
     if (!message.content.startsWith('!')) return;
-    
-    // Nur in Guilds (nicht in DMs)
+
     if (!message.guild) return;
 
     // --- ADMIN CHECK ---
@@ -212,7 +247,6 @@ client.on('messageCreate', async message => {
 
         // Prüfen, ob bereits ein Embed existiert (nur für DIESEN Server!)
         if (guildData.embeds && guildData.embeds.length > 0) {
-            // Prüfen, ob das gespeicherte Embed auch wirklich noch existiert
             try {
                 const oldEmbed = guildData.embeds[0];
                 const channel = await client.channels.fetch(oldEmbed.channelId);
@@ -243,41 +277,41 @@ client.on('messageCreate', async message => {
         deleteMsgAfter(reply, 5);
         return;
     }
-    
+
     // CLEAR Command - Löscht alle Clans und Spieler
     if (command === 'clear') {
         message.delete().catch(() => {});
-        
+
         guildData.clans = [];
         guildData.players = [];
         saveGuildData(guildId, guildData);
-        
+
         // Embeds aktualisieren
         await updateAllEmbeds(guildId, guildData);
-        
+
         const reply = await message.channel.send("🗑️ **DK-Liste wurde komplett geleert.**");
         deleteMsgAfter(reply, 3);
         return;
     }
-    
+
     // REFRESH Command
     if (command === 'refresh') {
         message.delete().catch(() => {});
         const success = await updateAllEmbeds(guildId, guildData);
-        
+
         let text = success 
             ? "✅ Liste wurde aktualisiert." 
             : "⚠️ Keine aktive Liste gefunden. Nutze `!setup`.";
-            
+
         const reply = await message.channel.send(text);
         deleteMsgAfter(reply, 3);
         return;
     }
-    
+
     // COMMANDS Übersicht
     if (command === 'commands' || command === 'help') {
         message.delete().catch(() => {});
-        
+
         const helpEmbed = new EmbedBuilder()
             .setTitle('🤖 Bot Commands')
             .setColor(0x0099FF)
@@ -293,17 +327,15 @@ client.on('messageCreate', async message => {
 \`!setup\` - Erstellt die DK-Liste in diesem Kanal (nur 1x möglich)
 \`!refresh\` - Aktualisiert die Liste manuell
 \`!reset\` - Falls die Liste gelöscht wurde: Setzt den Speicher zurück
-            `)
+`)
             .setFooter({ text: 'vx' });
-            
+
         await message.channel.send({ embeds: [helpEmbed] });
-        // Kein deleteMsgAfter mehr!
         return;
     }
 
     // Commands: !clan add ..., !clan remove ..., !player add ..., !player remove ...
     if (command === 'clan' || command === 'player') {
-        // User Command löschen (damit Chat clean bleibt)
         message.delete().catch(() => {});
 
         if (args.length < 2) {
@@ -319,19 +351,16 @@ client.on('messageCreate', async message => {
 
         if (command === 'clan') {
             if (action === 'add') {
-                // Case-insensitive Prüfung
                 const exists = guildData.clans.some(c => c.toLowerCase() === name.toLowerCase());
                 if (!exists) {
                     guildData.clans.push(name);
                     changed = true;
                     replyText = `✅ Clan **${name}** hinzugefügt.`;
                 } else {
-                    // Finde den originalen Namen (mit Groß-/Kleinschreibung)
                     const originalName = guildData.clans.find(c => c.toLowerCase() === name.toLowerCase());
                     replyText = `⚠️ Clan **${originalName}** ist bereits auf der Liste.`;
                 }
             } else if (action === 'remove') {
-                // Case-insensitive Suche
                 const index = guildData.clans.findIndex(c => c.toLowerCase() === name.toLowerCase());
                 if (index !== -1) {
                     const originalName = guildData.clans[index];
@@ -344,19 +373,16 @@ client.on('messageCreate', async message => {
             }
         } else if (command === 'player') {
             if (action === 'add') {
-                // Case-insensitive Prüfung
                 const exists = guildData.players.some(p => p.toLowerCase() === name.toLowerCase());
                 if (!exists) {
                     guildData.players.push(name);
                     changed = true;
                     replyText = `✅ Spieler **${name}** hinzugefügt.`;
                 } else {
-                    // Finde den originalen Namen (mit Groß-/Kleinschreibung)
                     const originalName = guildData.players.find(p => p.toLowerCase() === name.toLowerCase());
                     replyText = `⚠️ Spieler **${originalName}** ist bereits auf der Liste.`;
                 }
             } else if (action === 'remove') {
-                // Case-insensitive Suche
                 const index = guildData.players.findIndex(p => p.toLowerCase() === name.toLowerCase());
                 if (index !== -1) {
                     const originalName = guildData.players[index];
@@ -371,11 +397,9 @@ client.on('messageCreate', async message => {
 
         if (changed) {
             saveGuildData(guildId, guildData);
-            // Versuche, ALLE Embeds für DIESEN Server zu aktualisieren
             await updateAllEmbeds(guildId, guildData);
         }
 
-        // Bestätigung senden und nach 3 Sekunden löschen
         if (replyText) {
             const reply = await message.channel.send(replyText);
             deleteMsgAfter(reply, 3);
@@ -383,7 +407,7 @@ client.on('messageCreate', async message => {
     }
 });
 
-// DEBUG: Check Token
+// Debug: Check Token
 if (!process.env.DISCORD_TOKEN) {
     console.error("FEHLER: Kein DISCORD_TOKEN in der .env Datei gefunden!");
     console.log("Bitte stelle sicher, dass die .env Datei korrekt erstellt wurde.");
